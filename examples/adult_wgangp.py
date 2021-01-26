@@ -1,5 +1,5 @@
-from ydata_synthetic.preprocessing.adult import transformations
-from ydata_synthetic.synthesizers import WGAN_GP
+from ydata_synthetic.preprocessing.regular.adult import transformations
+from ydata_synthetic.synthesizers.regular import WGAN_GP
 
 #Load and process the data
 data, processed_data, preprocessor = transformations()
@@ -25,3 +25,4 @@ synthesizer = WGAN_GP(gan_args, n_critic=2)
 synthesizer.train(processed_data, train_args)
 
 synth_data = synthesizer.sample(1000)
+print(synth_data)
