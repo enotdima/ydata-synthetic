@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 from scipy import stats
+from ydata_synthetic.synthesizers.
 
 from sklearn.metrics import f1_score, mean_squared_error, jaccard_score
 from scipy.spatial.distance import cosine
-from dython.nominal import compute_associations
+#from dython.nominal import compute_associations
 
 
 def mean_absolute_error(y_true: np.ndarray, y_pred: np.ndarray):
@@ -32,25 +34,27 @@ def cosine_similarity(y_true: np.ndarray, y_pred: np.ndarray):
 
 class TableEvaluator:
     """
-
+    Contains methods for evaliation of real vs fake data.
     """
     def __init__(
             self,
             real_data: pd.DataFrame,
             fake_data: pd.DataFrame,
-            unique_threshold=0,
-            metric='pearsonr',
+            n_samples: int,
+            metric='pearson',
             verbose=False,
-            name: str = None,
             seed=59
     ):
-        self.name = name
-        self.unique_thresh = unique_threshold
-        self.real_data = real_data.copy()
-        self.fake = fake_data.copy()
+        self.n_samples = n_samples
         self.comparison_metric = getattr(stats, metric)
         self.verbose = verbose
         self.random_seed = seed
+        if n_samples:
+            self.real_data = real_data.sample(n_samples)
+            self.fake_data = fake_data.sample(n_samples)
+        else:
+            self.real_data = real_data.copy()
+            self.fake_data = fake_data.copy()
 
     def correlation_distance(self, how: str = 'euclidean') -> float:
         if how == 'euclidean':
@@ -59,11 +63,6 @@ class TableEvaluator:
             distance_func = mean_absolute_error
         elif how == 'rmse':
             distance_func = rmse
-        elif how == 'cosine':
-            def custom_cosine(a, b):
-                return cosine(a.reshape(-1), b.reshape(-1))
-
-            distance_func = custom_cosine
         else:
             raise ValueError(f'`how` parameter must be in [euclidean, mae, rmse]')
 
@@ -75,8 +74,30 @@ class TableEvaluator:
             fake_corr.values
         )
 
-    def fit_estimators(self):
+    def pca_correlation(self, n_components=5):
+        # Initialize PCA
+        pca_real = PCA(n_components=n_components)
+        pca_fake = PCA(n_components=n_components)
+        # Fit PCA on real and fake data
+        pca_real.fit(self.real_data)
+        pca_fake.fit(self.fake_data)
+        results = pd.DataFrame(
+            {
+                'real_data_pca': pca_real.explained_variance_,
+                'fake_data_pca': pca_fake.explained_variance_
+            }
+        )
 
+        print(f'\nTop 5 PCA components:')
+        print(results.to_string())
+
+        pca_mape = 1 - mean_absolute_percentage_error(self.pca_r.explained_variance_, self.pca_f.explained_variance_)
+        return pca_mape
+
+    def fit_estimators(self):
+        """
+        Fit given estimators.
+        """
         for i, est in enumerate(self.r_estimators):
             if self.verbose:
                 pass
