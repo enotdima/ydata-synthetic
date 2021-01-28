@@ -1,13 +1,10 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from scipy import stats
-from ydata_synthetic.synthesizers.
 
 from sklearn.metrics import f1_score, mean_squared_error, jaccard_score
-from scipy.spatial.distance import cosine
-#from dython.nominal import compute_associations
+
 
 
 def mean_absolute_error(y_true: np.ndarray, y_pred: np.ndarray):
@@ -32,7 +29,7 @@ def cosine_similarity(y_true: np.ndarray, y_pred: np.ndarray):
     return np.sum(y_true * y_pred) / (np.sqrt(np.sum(y_true ** 2)) * np.sqrt(np.sum(y_pred ** 2)))
 
 
-class TableEvaluator:
+class EvaluateData:
     """
     Contains methods for evaliation of real vs fake data.
     """
@@ -42,12 +39,10 @@ class TableEvaluator:
             fake_data: pd.DataFrame,
             n_samples: int,
             metric='pearson',
-            verbose=False,
             seed=59
     ):
         self.n_samples = n_samples
         self.comparison_metric = getattr(stats, metric)
-        self.verbose = verbose
         self.random_seed = seed
         if n_samples:
             self.real_data = real_data.sample(n_samples)
@@ -55,24 +50,6 @@ class TableEvaluator:
         else:
             self.real_data = real_data.copy()
             self.fake_data = fake_data.copy()
-
-    def correlation_distance(self, how: str = 'euclidean') -> float:
-        if how == 'euclidean':
-            distance_func = euclidean_distance
-        elif how == 'mae':
-            distance_func = mean_absolute_error
-        elif how == 'rmse':
-            distance_func = rmse
-        else:
-            raise ValueError(f'`how` parameter must be in [euclidean, mae, rmse]')
-
-        real_corr = compute_associations(self.real, nominal_columns=self.categorical_columns, theil_u=True)
-        fake_corr = compute_associations(self.fake, nominal_columns=self.categorical_columns, theil_u=True)
-
-        return distance_func(
-            real_corr.values,
-            fake_corr.values
-        )
 
     def pca_correlation(self, n_components=5):
         # Initialize PCA
@@ -88,10 +65,10 @@ class TableEvaluator:
             }
         )
 
-        print(f'\nTop 5 PCA components:')
+        print(f'Top {n_components} PCA components:')
         print(results.to_string())
 
-        pca_mape = 1 - mean_absolute_percentage_error(self.pca_r.explained_variance_, self.pca_f.explained_variance_)
+        pca_mape = 1 - mean_absolute_percentage_error(pca_real.explained_variance_, pca_fake.explained_variance_)
         return pca_mape
 
     def fit_estimators(self):
@@ -117,8 +94,9 @@ class TableEvaluator:
                 f1_r = f1_score(target, predictions_classifier_real, average="micro")
                 f1_f = f1_score(target, predictions_classifier_fake, average="micro")
                 jac_sim = jaccard_score(predictions_classifier_real, predictions_classifier_fake, average='micro')
-                row = {'index': f'{estimator_name}_{dataset_name}_testset', 'f1_real': f1_r, 'f1_fake': f1_f,
-                           'jaccard_similarity': jac_sim}
+                row = {'index': f'{estimator_name}_{dataset_name}_testset',
+                       'f1_real': f1_r, 'f1_fake': f1_f,
+                        'jaccard_similarity': jac_sim}
                 rows.append(row)
         results = pd.DataFrame(rows).set_index('index')
         return results
