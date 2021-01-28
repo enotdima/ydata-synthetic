@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
+import sklearn
+
 from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
 from scipy import stats
 
 from sklearn.metrics import f1_score, mean_squared_error, jaccard_score
@@ -15,7 +18,7 @@ def euclidean_distance(y_true: np.ndarray, y_pred: np.ndarray):
     return np.sqrt(np.sum(np.power(np.subtract(y_true, y_pred), 2)))
 
 
-def mean_absolute_percentage_error(y_true: np.ndarray, y_pred: np.ndarray):
+def mape(y_true: np.ndarray, y_pred: np.ndarray):
     y_true, y_pred = np.array(y_true), np.array(y_pred)
     return np.mean(np.abs((y_true - y_pred) / y_true))
 
@@ -68,35 +71,78 @@ class EvaluateData:
         print(f'Top {n_components} PCA components:')
         print(results.to_string())
 
-        pca_mape = 1 - mean_absolute_percentage_error(pca_real.explained_variance_, pca_fake.explained_variance_)
+        pca_mape = 1 - mape(pca_real.explained_variance_, pca_fake.explained_variance_)
         return pca_mape
 
-    def fit_estimators(self):
+    def fit_estimators(self, real_estimators, fake_estimators, real_features_train, real_target_train, fake_features_train, fake_target_train):
         """
         Fit given estimators.
         """
-        for i, est in enumerate(self.r_estimators):
-            if self.verbose:
-                pass
-            est.fit(self.real_x_train, self.real_y_train)
-            est.fit(self.fake_x_train, self.fake_y_train)
+        for i, est in enumerate(real_estimators):
+            est.fit(real_features_train, real_target_train)
+        for i, est in enumerate(fake_estimators):
+            est.fit(fake_features_train, fake_target_train)
+        return real_estimators, fake_estimators
 
-    def score_estimators(self):
+    def score_estimators(
+            self,
+            real_estimators,
+            fake_estimators,
+            real_features_test,
+            fake_features_test,
+            real_target_test,
+            fake_target_test
+    ):
         rows = []
-        for r_classifier, f_classifier, estimator_name in zip(self.r_estimators, self.f_estimators, self.estimator_names):
+        for real_est, fake_est in zip(real_estimators, fake_estimators):
             for dataset, target, dataset_name in zip(
-                    [self.real_x_test, self.fake_x_test],
-                    [self.real_y_test, self.fake_y_test],
+                    [real_features_test, fake_features_test],
+                    [real_target_test, fake_target_test],
                     ['real', 'fake']
             ):
-                predictions_classifier_real = r_classifier.predict(dataset)
-                predictions_classifier_fake = f_classifier.predict(dataset)
-                f1_r = f1_score(target, predictions_classifier_real, average="micro")
-                f1_f = f1_score(target, predictions_classifier_fake, average="micro")
-                jac_sim = jaccard_score(predictions_classifier_real, predictions_classifier_fake, average='micro')
-                row = {'index': f'{estimator_name}_{dataset_name}_testset',
-                       'f1_real': f1_r, 'f1_fake': f1_f,
-                        'jaccard_similarity': jac_sim}
+                predictions_classifier_real = real_est.predict(dataset)
+                predictions_classifier_fake = fake_est.predict(dataset)
+                row = {'index': f'{dataset_name}_test',
+                       'real_data_f1': f1_score(target, predictions_classifier_real, average="micro"),
+                       'fake_data_f1': f1_score(target, predictions_classifier_fake, average="micro"),
+                       }
                 rows.append(row)
         results = pd.DataFrame(rows).set_index('index')
-        return results
+        metric = mape(results['real_data_f1'], results['fake_data_f1'])
+        return results, mape
+
+    def set_ml_estimation(self, target_column="target"):
+        real_features = self.real_data.drop([target_column], axis=1)
+        real_target = self.real_data[target_column]
+        fake_features = self.fake_data.drop([target_column], axis=1)
+        fake_target = self.fake_data[target_column]
+        np.random.seed(self.random_seed)
+        real_features_train, \
+        real_features_test,\
+        real_target_train, \
+        real_target_test = train_test_split(real_features, real_target)
+        fake_features_train, \
+        fake_features_test, \
+        fake_target_train, \
+        fake_target_test = train_test_split(fake_features, fake_target)
+
+        real_estimators = fake_estimators = [
+            sklearn.linear_model.LogisticRegression(max_iter=1000, random_state=self.random_seed),
+            sklearn.tree.DecisionTreeClassifier(random_state=self.random_seed),
+            sklearn.ensemble.RandomForestClassifier(n_estimators=12, random_state=self.random_seed),
+        ]
+        real_estimators, fake_estimators = \
+            self.fit_estimators(real_estimators, 
+                                fake_estimators, 
+                                real_features_train, 
+                                real_target_train, 
+                                fake_features_train, 
+                                fake_target_train
+                                )
+        results, mape = self.score_estimators(real_estimators,
+                                fake_estimators,
+                                real_features_train,
+                                real_target_train,
+                                fake_features_train,
+                                fake_target_train)
+        return mape
