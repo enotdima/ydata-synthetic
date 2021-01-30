@@ -9,8 +9,8 @@ import numpy as np
 import sklearn.cluster as cluster
 import matplotlib.pyplot as plt
 
-from ydata_synthetic.preprocessing.adult import transformations
 from ydata_synthetic.synthesizers import WGAN_GP
+from ydata_synthetic.preprocessing.credit_fraud import *
 
 model = WGAN_GP
 
@@ -83,6 +83,7 @@ synth = WGAN_GP.load(path='models/wgan_creditcard.pkl')
 #Sampling the data
 #Note that the data returned it is not inverse processed.
 data_sample = synth.sample(100000)
+
 print('Testing the sample of data.')
 
 #Sample events using the trained model
