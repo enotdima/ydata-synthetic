@@ -1,8 +1,3 @@
-import pandas as pd
-import dask
-import dask.dataframe as dd
-import dask_ml
-
 from dask_ml.preprocessing import Categorizer, OneHotEncoder, StandardScaler
 from dask_ml.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline

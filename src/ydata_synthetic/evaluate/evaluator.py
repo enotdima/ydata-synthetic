@@ -3,11 +3,11 @@ import numpy as np
 import sklearn
 
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import f1_score, mean_squared_error
 from scipy import stats
-
-from sklearn.metrics import f1_score, mean_squared_error, jaccard_score
-
 
 
 def mean_absolute_error(y_true: np.ndarray, y_pred: np.ndarray):
@@ -36,6 +36,7 @@ class EvaluateData:
     """
     Contains methods for evaliation of real vs fake data.
     """
+
     def __init__(
             self,
             real_data: pd.DataFrame,
@@ -59,8 +60,8 @@ class EvaluateData:
         pca_real = PCA(n_components=n_components)
         pca_fake = PCA(n_components=n_components)
         # Fit PCA on real and fake data
-        pca_real.fit(self.real_data)
-        pca_fake.fit(self.fake_data)
+        pca_real.fit(self.real_data.to_numpy())
+        pca_fake.fit(self.fake_data.to_numpy())
         results = pd.DataFrame(
             {
                 'real_data_pca': pca_real.explained_variance_,
@@ -74,14 +75,15 @@ class EvaluateData:
         pca_mape = 1 - mape(pca_real.explained_variance_, pca_fake.explained_variance_)
         return pca_mape
 
-    def fit_estimators(self, real_estimators, fake_estimators, real_features_train, real_target_train, fake_features_train, fake_target_train):
+    def fit_estimators(self, real_estimators, fake_estimators, real_features_train, real_target_train,
+                       fake_features_train, fake_target_train):
         """
         Fit given estimators.
         """
         for i, est in enumerate(real_estimators):
-            est.fit(real_features_train, real_target_train)
+            real_estimators[i] = est.fit(real_features_train, real_target_train)
         for i, est in enumerate(fake_estimators):
-            est.fit(fake_features_train, fake_target_train)
+            fake_estimators[i] = est.fit(fake_features_train, fake_target_train)
         return real_estimators, fake_estimators
 
     def score_estimators(
@@ -102,14 +104,14 @@ class EvaluateData:
             ):
                 predictions_classifier_real = real_est.predict(dataset)
                 predictions_classifier_fake = fake_est.predict(dataset)
-                row = {'index': f'{dataset_name}_test',
+                row = {'index': f'{real_est.__class__.__name__}_{dataset_name}_test',
                        'real_data_f1': f1_score(target, predictions_classifier_real, average="micro"),
                        'fake_data_f1': f1_score(target, predictions_classifier_fake, average="micro"),
                        }
                 rows.append(row)
         results = pd.DataFrame(rows).set_index('index')
-        metric = mape(results['real_data_f1'], results['fake_data_f1'])
-        return results, mape
+        metric = 1 - mape(results['real_data_f1'], results['fake_data_f1'])
+        return results, metric
 
     def set_ml_estimation(self, target_column="target"):
         real_features = self.real_data.drop([target_column], axis=1)
@@ -117,32 +119,38 @@ class EvaluateData:
         fake_features = self.fake_data.drop([target_column], axis=1)
         fake_target = self.fake_data[target_column]
         np.random.seed(self.random_seed)
-        real_features_train, \
-        real_features_test,\
-        real_target_train, \
-        real_target_test = train_test_split(real_features, real_target)
-        fake_features_train, \
-        fake_features_test, \
-        fake_target_train, \
-        fake_target_test = train_test_split(fake_features, fake_target)
-
-        real_estimators = fake_estimators = [
+        real_features_train, real_features_test, real_target_train, real_target_test = train_test_split(
+            real_features, real_target
+        )
+        fake_features_train, fake_features_test, fake_target_train, fake_target_test = train_test_split(
+            fake_features, fake_target
+        )
+        real_estimators = [
             sklearn.linear_model.LogisticRegression(max_iter=1000, random_state=self.random_seed),
-            sklearn.tree.DecisionTreeClassifier(random_state=self.random_seed),
-            sklearn.ensemble.RandomForestClassifier(n_estimators=12, random_state=self.random_seed),
+            DecisionTreeClassifier(random_state=self.random_seed),
+            RandomForestClassifier(n_estimators=12, random_state=self.random_seed),
         ]
-        real_estimators, fake_estimators = \
-            self.fit_estimators(real_estimators, 
-                                fake_estimators, 
-                                real_features_train, 
-                                real_target_train, 
-                                fake_features_train, 
-                                fake_target_train
-                                )
-        results, mape = self.score_estimators(real_estimators,
-                                fake_estimators,
-                                real_features_train,
-                                real_target_train,
-                                fake_features_train,
-                                fake_target_train)
-        return mape
+
+        fake_estimators = [
+            sklearn.linear_model.LogisticRegression(max_iter=1000, random_state=self.random_seed),
+            DecisionTreeClassifier(random_state=self.random_seed),
+            RandomForestClassifier(n_estimators=12, random_state=self.random_seed),
+        ]
+
+        real_estimators, fake_estimators = self.fit_estimators(
+            real_estimators,
+            fake_estimators,
+            real_features_train,
+            real_target_train,
+            fake_features_train,
+            fake_target_train
+        )
+        results, score = self.score_estimators(
+            real_estimators,
+            fake_estimators,
+            real_features_train,
+            fake_features_train,
+            real_target_train,
+            fake_target_train
+        )
+        return results, score
