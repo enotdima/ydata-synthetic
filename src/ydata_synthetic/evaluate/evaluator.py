@@ -6,30 +6,13 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score, mean_squared_error
+from sklearn.metrics import f1_score
 from scipy import stats
-
-
-def mean_absolute_error(y_true: np.ndarray, y_pred: np.ndarray):
-    return np.mean(np.abs(np.subtract(y_true, y_pred)))
-
-
-def euclidean_distance(y_true: np.ndarray, y_pred: np.ndarray):
-    return np.sqrt(np.sum(np.power(np.subtract(y_true, y_pred), 2)))
 
 
 def mape(y_true: np.ndarray, y_pred: np.ndarray):
     y_true, y_pred = np.array(y_true), np.array(y_pred)
     return np.mean(np.abs((y_true - y_pred) / y_true))
-
-
-def rmse(y_true: np.ndarray, y_pred: np.ndarray):
-    return np.sqrt(mean_squared_error(y_true, y_pred))
-
-
-def cosine_similarity(y_true: np.ndarray, y_pred: np.ndarray):
-    y_true, y_pred = y_true.reshape(-1), y_pred.reshape(-1)
-    return np.sum(y_true * y_pred) / (np.sqrt(np.sum(y_true ** 2)) * np.sqrt(np.sum(y_pred ** 2)))
 
 
 class EvaluateData:
