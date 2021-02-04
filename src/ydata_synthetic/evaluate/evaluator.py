@@ -11,15 +11,15 @@ from scipy import stats
 
 
 def mape(y_true: np.ndarray, y_pred: np.ndarray):
+
     y_true, y_pred = np.array(y_true), np.array(y_pred)
     return np.mean(np.abs((y_true - y_pred) / y_true))
 
 
 class EvaluateData:
     """
-    Contains methods for evaliation of real vs fake data.
+    Contains methods for evaluation of real vs fake data.
     """
-
     def __init__(
             self,
             real_data: pd.DataFrame,
@@ -58,8 +58,15 @@ class EvaluateData:
         pca_mape = 1 - mape(pca_real.explained_variance_, pca_fake.explained_variance_)
         return pca_mape
 
-    def fit_estimators(self, real_estimators, fake_estimators, real_features_train, real_target_train,
-                       fake_features_train, fake_target_train):
+    @staticmethod
+    def fit_estimators(
+            real_estimators,
+            fake_estimators,
+            real_features_train,
+            real_target_train,
+            fake_features_train,
+            fake_target_train
+    ):
         """
         Fit given estimators.
         """
@@ -69,8 +76,8 @@ class EvaluateData:
             fake_estimators[i] = est.fit(fake_features_train, fake_target_train)
         return real_estimators, fake_estimators
 
+    @staticmethod
     def score_estimators(
-            self,
             real_estimators,
             fake_estimators,
             real_features_test,
